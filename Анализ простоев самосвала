@@ -1,0 +1,117 @@
+#include <iostream>
+#include <vector>
+#include <iomanip>
+#include <cmath>
+
+using namespace std;
+
+// Константы
+const double loading_time = 120; // Время погрузки, сек
+const double unloading_time = 90; // Время разгрузки, сек
+const double clearing_time = 180; // Время очистки места бульдозером, сек
+const double acceleration_loaded = 0.25; // Ускорение гружёного, м/с²
+const double acceleration_unloaded = 0.75; // Ускорение порожнего, м/с²
+const double time_accel_loaded = 24; // Время разгона гружёного, сек
+const double time_accel_unloaded = 8; // Время разгона порожнего, сек
+const double distance_accel_loaded = 72; // Путь разгона гружёного, м
+const double distance_accel_unloaded = 24; // Путь разгона порожнего, м
+
+// Структура участка
+struct Section {
+    string name;
+    double distance; // м
+    double speed;    // м/с
+};
+
+// Данные из таблицы 1 (гружёный)
+vector<Section> loaded_data = {
+    {"Ровная поверхность", 600, 12},
+    {"Спуск", 200, 7.5},
+    {"Подъем", 300, 7},
+    {"Ровная поверхность", 500, 12},
+    {"Подъем", 600, 7},
+    {"Зона погрузки и разгрузки", 656, 6} // 800 - 2 * 72
+};
+
+// Данные из таблицы 2 (порожняковый)
+vector<Section> unloaded_data = {
+    {"Ровная поверхность", 600, 12},
+    {"Подъем", 200, 7},
+    {"Спуск", 300, 7.5},
+    {"Ровная поверхность", 500, 12},
+    {"Спуск", 600, 7.5},
+    {"Зона погрузки и разгрузки", 752, 6} // 800 - 2 * 24
+};
+
+// Функция расчёта времени прохождения участка
+double calculate_section_time(double distance, double speed) {
+    return distance / speed;
+}
+
+// Функция расчёта времени движения по маршруту
+double calculate_total_travel_time(const vector<Section>& sections, double accel_time) {
+    double total_time = 0;
+    for (const auto& sec : sections) {
+        total_time += calculate_section_time(sec.distance, sec.speed);
+    }
+    return total_time + 2 * accel_time;
+}
+
+// Полное время цикла
+double calculate_cycle_time() {
+    double T_loaded = calculate_total_travel_time(loaded_data, time_accel_loaded);
+    double T_unloaded = calculate_total_travel_time(unloaded_data, time_accel_unloaded);
+    return T_loaded + T_unloaded + loading_time + unloading_time;
+}
+
+// Функция расчёта рекомендуемой скорости на спуске
+double calculate_recommended_speed(double interval) {
+    double total_slope_distance = 200 + 900; // Суммарная длина спусков
+    double base_speed = 7.5; // Исходная скорость на спуске
+    double tpr = max(0.0, clearing_time - interval);
+    
+    if (tpr == 0) return base_speed; // Если простоев нет, скорость остаётся неизменной
+    
+    double new_speed = (base_speed * total_slope_distance) / (total_slope_distance + base_speed * tpr);
+    return max(6.84, new_speed); // Минимальная скорость не должна быть ниже 6.84 м/с
+}
+
+// Анализ работы парка
+void analyze_truck_operations(int truck_count) {
+    double cycle_time = calculate_cycle_time();
+    double interval = cycle_time / truck_count;
+    double idle_time_no_bulldozer = max(0.0, loading_time - interval);
+    double idle_time_with_bulldozer = max(0.0, clearing_time - interval);
+    bool has_idle_with_bulldozer = interval < clearing_time;
+    double recommended_speed = calculate_recommended_speed(interval);
+    
+    cout << "\n=== Результаты расчёта ===" << endl;
+    cout << "Время одного цикла: " << cycle_time << " сек" << endl;
+    cout << "Интервал прибытия самосвалов: " << interval << " сек" << endl;
+    cout << "Простои без бульдозера: " << idle_time_no_bulldozer << " сек" << endl;
+    cout << "Простои с бульдозером: " << idle_time_with_bulldozer << " сек" << endl;
+    cout << "Простои с бульдозером: " << (has_idle_with_bulldozer ? "Есть" : "Нет") << endl;
+    cout << "Рекомендуемая скорость на спуске: " << recommended_speed << " м/с" << endl;
+}
+
+// Расчёт количества циклов за 24 часа
+void calculate_trips_per_day(int truck_count) {
+    double cycle_time = calculate_cycle_time();
+    double trips_per_day = (24 * 3600) / cycle_time * truck_count;
+    cout << "\nКоличество циклов за 24 часа: " << trips_per_day << endl;
+}
+
+int main() {
+    int truck_count;
+    cout << "Введите количество самосвалов: ";
+    cin >> truck_count;
+    while (cin.fail() || truck_count <= 0) {
+        cin.clear();
+        cin.ignore(10000, '\n');
+        cout << "Ошибка ввода! Введите положительное целое число: ";
+        cin >> truck_count;
+    }
+    analyze_truck_operations(truck_count);
+    calculate_trips_per_day(truck_count);
+    return 0;
+}
